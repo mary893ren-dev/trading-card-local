@@ -38,6 +38,12 @@ const primaryButtonStyle: CSSProperties = {
   border: "1px solid #60a5fa",
 };
 
+const dangerButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  background: "#dc2626",
+  border: "1px solid #fca5a5",
+};
+
 function getDeckStatus(deck: DeckRecipe) {
   if (!deck.leaderCardId) {
     return "リーダー未設定";
@@ -261,7 +267,7 @@ export default function DeckSelect() {
         background: "#0f172a",
         color: "white",
         padding: "12px",
-        paddingBottom: "160px",
+        paddingBottom: "132px",
         boxSizing: "border-box",
         overflowY: "auto",
         overflowX: "hidden",
@@ -278,7 +284,7 @@ export default function DeckSelect() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: "22px" }}>
-          デッキ一覧
+          デッキ選択
         </h1>
 
         {!isZipLoaded && (
@@ -326,7 +332,7 @@ export default function DeckSelect() {
           </label>
 
           <button style={primaryButtonStyle} onClick={openNewDeck}>
-            新規作成
+            デッキ編集
           </button>
         </div>
 
@@ -429,7 +435,7 @@ export default function DeckSelect() {
                       disabled={!usable}
                       onClick={() => selectDeckForPlayer(1, deck)}
                     >
-                      上側に選択
+                      デッキ1に選択
                     </button>
 
                     <button
@@ -444,7 +450,7 @@ export default function DeckSelect() {
                       disabled={!usable}
                       onClick={() => selectDeckForPlayer(2, deck)}
                     >
-                      下側に選択
+                      デッキ2に選択
                     </button>
                   </div>
                 </div>
@@ -487,9 +493,9 @@ export default function DeckSelect() {
         >
           <div
             style={{
-              fontSize: "16px",
-              fontWeight: 900,
-              lineHeight: 1.6,
+              minWidth: 0,
+              fontSize: "12px",
+              lineHeight: 1.5,
             }}
           >
             <div
@@ -499,7 +505,7 @@ export default function DeckSelect() {
                 textOverflow: "ellipsis",
               }}
             >
-              上側：{getDeckName(player1DeckId)}
+              デッキ1：{getDeckName(player1DeckId)}
             </div>
 
             <div
@@ -509,7 +515,7 @@ export default function DeckSelect() {
                 textOverflow: "ellipsis",
               }}
             >
-              上側：{getDeckName(player2DeckId)}
+              デッキ2：{getDeckName(player2DeckId)}
             </div>
           </div>
 

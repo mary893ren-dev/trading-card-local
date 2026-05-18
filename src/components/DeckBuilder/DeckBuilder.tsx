@@ -114,6 +114,15 @@ export default function DeckBuilder({
 
   const [message, setMessage] = useState("");
 
+  const [messageAnimationKey, setMessageAnimationKey] =
+  useState(0);
+
+  function showMessage(nextMessage: string) {
+  setMessage(nextMessage);
+
+  setMessageAnimationKey((x) => x + 1);
+}
+
   const deckBuildableCardImages = useMemo(
     () => cardImages.filter((card) => card.series !== "system"),
     [cardImages]
@@ -265,7 +274,7 @@ export default function DeckBuilder({
       },
     }));
 
-    setMessage(`${cardId} を${addCount}枚追加しました。`);
+    showMessage(`${cardId} を${addCount}枚追加しました。`);
   }
 
   function setCardAsLeader(cardId: string) {
@@ -278,7 +287,7 @@ export default function DeckBuilder({
       },
     }));
 
-    setMessage(`${cardId} をリーダーに設定しました。`);
+    showMessage(`${cardId} をリーダーに設定しました。`);
   }
 
   function addCardToDon(cardId: string) {
@@ -534,7 +543,7 @@ export default function DeckBuilder({
               gap: "8px",
             }}
           >
-            <h1 style={{ margin: 0, fontSize: "22px" }}>デッキ一覧</h1>
+            <h1 style={{ margin: 0, fontSize: "22px" }}>デッキ編集</h1>
 
             <button style={buttonStyle} onClick={onBack}>
               デッキ選択へ戻る
@@ -763,10 +772,13 @@ export default function DeckBuilder({
 
           {message && (
             <div
+            　key={messageAnimationKey}
               style={{
                 background: "#334155",
                 padding: "8px 10px",
                 borderRadius: "8px",
+                animation:
+                  "deckBuilderMessageFlash 0.45s ease",
               }}
             >
               {message}
@@ -966,10 +978,13 @@ export default function DeckBuilder({
 
         {message && (
           <div
+          　key={messageAnimationKey}
             style={{
               background: "#334155",
               padding: "8px 10px",
               borderRadius: "8px",
+              animation:
+                "deckBuilderMessageFlash 0.45s ease",
             }}
           >
             {message}
@@ -994,7 +1009,7 @@ export default function DeckBuilder({
               color: "#cbd5e1",
             }}
           >
-            カード画像が未読込です。デッキ一覧画面で画像ZIPを読み込んでください。
+            カード画像が未読込です。デッキ選択画面で画像ZIPを読み込んでください。
           </div>
         ) : (
           <div

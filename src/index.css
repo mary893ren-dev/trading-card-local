@@ -49,3 +49,30 @@ select {
 
   padding: 0;
 }
+
+@keyframes deckBuilderMessageFlash {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  20% {
+    transform: scale(1.08);
+    opacity: 0.35;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  60% {
+    transform: scale(1.08);
+    opacity: 0.35;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
