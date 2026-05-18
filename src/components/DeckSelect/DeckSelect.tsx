@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { CSSProperties } from "react";
 
@@ -6,139 +6,237 @@ import { useGameStore } from "../../store/gameStore";
 
 import DeckBuilder from "../DeckBuilder/DeckBuilder";
 
-import type { DeckJson, DeckListItem } from "../../types/deck";
-
-import {
-  loadDeck,
-  loadDeckList,
-} from "../../utils/deckLoader";
+import type { DeckRecipe } from "../../types/deck";
 
 import {
   buildDeckCardsFromRecipe,
+  getAllLocalDeckRecipes,
   getLocalDeckRecipe,
-  listLocalDeckRecipes,
 } from "../../utils/localDeckStorage";
 
-import { hasLocalCardImages } from "../../utils/localCardImages";
-
-type PreviewTarget = "player1" | "player2" | null;
+import {
+  getLocalCardImage,
+  hasLocalCardImages,
+  loadCardImagesFromZip,
+} from "../../utils/localCardImages";
 
 type ScreenMode = "select" | "builder";
 
-type DeckChoice =
-  | {
-    kind: "public";
-    path: string;
-  }
-  | {
-    kind: "local";
-    id: string;
-  }
-  | null;
+const buttonStyle: CSSProperties = {
+  padding: "9px 12px",
+  borderRadius: "8px",
+  border: "1px solid #475569",
+  background: "#1e293b",
+  color: "white",
+  fontWeight: 800,
+  cursor: "pointer",
+};
 
-function parseDeckValue(value: string): DeckChoice {
-  if (!value) {
-    return null;
-  }
+const primaryButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  background: "#2563eb",
+  border: "1px solid #60a5fa",
+};
 
-  if (value.startsWith("local:")) {
-    return {
-      kind: "local",
-      id: value.replace("local:", ""),
-    };
+function getDeckStatus(deck: DeckRecipe) {
+  if (!deck.leaderCardId) {
+    return "リーダー未設定";
   }
 
-  return {
-    kind: "public",
-    path: value,
-  };
+  if (deck.mainDeck.length !== 50) {
+    return `メイン${deck.mainDeck.length}/50`;
+  }
+
+  return "使用可能";
 }
 
-function toDeckValue(choice: DeckChoice) {
-  if (!choice) {
-    return "";
+function canUseDeck(deck: DeckRecipe) {
+  return deck.leaderCardId !== null && deck.mainDeck.length === 50;
+}
+
+function renderLeaderIcon(deck: DeckRecipe) {
+  const imageUrl = deck.leaderCardId
+    ? getLocalCardImage(deck.leaderCardId)?.imageUrl
+    : null;
+
+  if (!imageUrl) {
+    return (
+      <div
+        style={{
+          width: "54px",
+          height: "76px",
+          borderRadius: "8px",
+          background: "#0f172a",
+          border: "1px solid #475569",
+          color: "#94a3b8",
+          fontSize: "10px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          flexShrink: 0,
+        }}
+      >
+        no img
+      </div>
+    );
   }
 
-  if (choice.kind === "local") {
-    return `local:${choice.id}`;
-  }
-
-  return choice.path;
+  return (
+    <img
+      src={imageUrl}
+      draggable={false}
+      style={{
+        width: "54px",
+        borderRadius: "8px",
+        display: "block",
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 
 export default function DeckSelect() {
   const [mode, setMode] = useState<ScreenMode>("select");
 
-  const [deckList, setDeckList] = useState<DeckListItem[]>([]);
+  const [editingDeckId, setEditingDeckId] =
+    useState<string | null>(null);
 
-  const [localDeckList, setLocalDeckList] = useState(
-    listLocalDeckRecipes()
+  const [decks, setDecks] = useState<DeckRecipe[]>(
+    getAllLocalDeckRecipes()
   );
 
-  const [player1Deck, setPlayer1Deck] = useState<DeckChoice>(null);
-  const [player2Deck, setPlayer2Deck] = useState<DeckChoice>(null);
+  const [player1DeckId, setPlayer1DeckId] =
+    useState<string | null>(null);
+
+  const [player2DeckId, setPlayer2DeckId] =
+    useState<string | null>(null);
+
+  const [isZipLoaded, setIsZipLoaded] = useState(hasLocalCardImages());
+
+  const [message, setMessage] = useState("");
 
   const [error, setError] = useState("");
 
-  const [previewTarget, setPreviewTarget] =
-    useState<PreviewTarget>(null);
-
-  const [previewDeck, setPreviewDeck] =
-    useState<DeckJson | null>(null);
-
   const startGame = useGameStore((x) => x.startGame);
 
-  useEffect(() => {
-    loadDeckList()
-      .then(setDeckList)
-      .catch(() => {
-        setDeckList([]);
-      });
-  }, []);
+  function refreshDecks() {
+    const nextDecks = getAllLocalDeckRecipes();
 
-  function refreshLocalDecks() {
-    setLocalDeckList(listLocalDeckRecipes());
+    setDecks(nextDecks);
+
+    if (
+      player1DeckId &&
+      !nextDecks.some((deck) => deck.id === player1DeckId)
+    ) {
+      setPlayer1DeckId(null);
+    }
+
+    if (
+      player2DeckId &&
+      !nextDecks.some((deck) => deck.id === player2DeckId)
+    ) {
+      setPlayer2DeckId(null);
+    }
   }
 
-  async function loadSelectedDeck(choice: DeckChoice) {
-    if (!choice) {
-      throw new Error("デッキを選択してください");
+  async function handleLoadZip(file: File | null) {
+    if (!file) {
+      return;
     }
 
-    if (choice.kind === "public") {
-      return await loadDeck(choice.path);
-    }
-
-    if (!hasLocalCardImages()) {
-      throw new Error(
-        "作成デッキを使うには、先にデッキ一覧画面で画像ZIPを読み込んでください。"
-      );
-    }
-
-    const recipe = getLocalDeckRecipe(choice.id);
-
-    if (!recipe) {
-      throw new Error("保存済みデッキが見つかりません。");
-    }
-
-    return buildDeckCardsFromRecipe(recipe);
-  }
-
-  const canStart = player1Deck !== null && player2Deck !== null;
-
-  async function handleStart() {
+    setMessage("画像ZIPを読み込み中...");
     setError("");
 
     try {
-      const player1Cards = await loadSelectedDeck(player1Deck);
-      const player2Cards = await loadSelectedDeck(player2Deck);
+      const loaded = await loadCardImagesFromZip(file);
+
+      setIsZipLoaded(hasLocalCardImages());
+
+      setMessage(
+        loaded.length > 0
+          ? `${loaded.length}枚の画像を読み込みました。`
+          : "画像が0枚です。ZIP内が cards/OP01/OP01-001.png のような構成か確認してください。"
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "画像ZIPの読み込みに失敗しました。"
+      );
+    }
+  }
+
+  function openNewDeck() {
+    setEditingDeckId(null);
+    setMode("builder");
+  }
+
+  function openEditDeck(deckId: string) {
+    setEditingDeckId(deckId);
+    setMode("builder");
+  }
+
+  function getDeckName(deckId: string | null) {
+    if (!deckId) {
+      return "未選択";
+    }
+
+    return decks.find((deck) => deck.id === deckId)?.name ?? "不明なデッキ";
+  }
+
+  function selectDeckForPlayer(playerIndex: 1 | 2, deck: DeckRecipe) {
+    if (!canUseDeck(deck)) {
+      setError(
+        `${deck.name} は使用できません。リーダー設定済み、かつメインデッキ50枚のデッキだけ選択できます。`
+      );
+      return;
+    }
+
+    if (playerIndex === 1) {
+      setPlayer1DeckId(deck.id);
+    } else {
+      setPlayer2DeckId(deck.id);
+    }
+
+    setError("");
+  }
+
+  function canStart() {
+    return player1DeckId !== null && player2DeckId !== null;
+  }
+
+  function handleStart() {
+    setError("");
+
+    if (!isZipLoaded) {
+      setError("ゲーム開始前に画像ZIPを読み込んでください。");
+      return;
+    }
+
+    if (!player1DeckId || !player2DeckId) {
+      setError("デッキ1とデッキ2を選択してください。");
+      return;
+    }
+
+    const player1Recipe = getLocalDeckRecipe(player1DeckId);
+    const player2Recipe = getLocalDeckRecipe(player2DeckId);
+
+    if (!player1Recipe || !player2Recipe) {
+      setError("選択したデッキが見つかりません。");
+      refreshDecks();
+      return;
+    }
+
+    try {
+      const player1Cards = buildDeckCardsFromRecipe(player1Recipe);
+      const player2Cards = buildDeckCardsFromRecipe(player2Recipe);
 
       startGame(player1Cards, player2Cards);
     } catch (e) {
       setError(
         e instanceof Error
           ? e.message
-          : "デッキ読み込みに失敗しました"
+          : "デッキ読み込みに失敗しました。"
       );
     }
   }
@@ -146,315 +244,289 @@ export default function DeckSelect() {
   if (mode === "builder") {
     return (
       <DeckBuilder
+        initialDeckId={editingDeckId}
         onBack={() => {
-          refreshLocalDecks();
+          refreshDecks();
+          setIsZipLoaded(hasLocalCardImages());
           setMode("select");
         }}
       />
     );
   }
 
-  if (previewDeck && previewTarget) {
-    const totalCount =
-      previewDeck.cards.reduce(
-        (sum, card) => sum + card.count,
-        0
-      ) + 1;
-
-    return (
-      <div
-        style={{
-          height: "100dvh",
-          background: "#0f172a",
-          color: "white",
-          padding: "16px",
-          overflowY: "auto",
-          boxSizing: "border-box",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "900px",
-            margin: "0 auto",
-            padding: "16px",
-            border: "2px solid #475569",
-            borderRadius: "16px",
-            background: "#1e293b",
-          }}
-        >
-          <button
-            onClick={() => {
-              setPreviewDeck(null);
-              setPreviewTarget(null);
-            }}
-            style={{
-              marginBottom: "16px",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
-          >
-            戻る
-          </button>
-
-          <h1>{previewDeck.name}</h1>
-
-          <div style={{ marginBottom: "16px" }}>
-            合計：{totalCount}枚
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              alignItems: "center",
-              background: "#334155",
-              padding: "12px",
-              borderRadius: "12px",
-              marginBottom: "16px",
-            }}
-          >
-            {previewDeck.leader.image ? (
-              <img
-                src={previewDeck.leader.image}
-                style={{
-                  width: "90px",
-                  borderRadius: "8px",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "90px",
-                  height: "126px",
-                  borderRadius: "8px",
-                  background: "#0f172a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "11px",
-                }}
-              >
-                local
-              </div>
-            )}
-
-            <div>
-              <div style={{ fontWeight: "bold" }}>
-                リーダー：{previewDeck.leader.name}
-              </div>
-
-              <div>
-                ライフ：{previewDeck.leader.lifeCount}
-              </div>
-
-              <div>枚数：1枚</div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-            }}
-          >
-            {previewDeck.cards.map((card, index) => (
-              <div
-                key={`${card.name}-${index}`}
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  alignItems: "center",
-                  background: "#334155",
-                  padding: "10px",
-                  borderRadius: "10px",
-                }}
-              >
-                {card.image ? (
-                  <img
-                    src={card.image}
-                    style={{
-                      width: "80px",
-                      borderRadius: "6px",
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: "80px",
-                      height: "112px",
-                      borderRadius: "6px",
-                      background: "#0f172a",
-                      flexShrink: 0,
-                    }}
-                  />
-                )}
-
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: "bold" }}>
-                    {card.name}
-                  </div>
-
-                  <div>種類：{card.type}</div>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {card.count}枚
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const selectStyle: CSSProperties = {
-    width: "100%",
-    marginTop: "8px",
-    padding: "10px",
-    borderRadius: "8px",
-  };
-
   return (
     <div
       style={{
-        minHeight: "100dvh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
+        height: "100dvh",
         background: "#0f172a",
         color: "white",
         padding: "12px",
+        paddingBottom: "132px",
         boxSizing: "border-box",
+        overflowY: "auto",
+        overflowX: "hidden",
+        WebkitOverflowScrolling: "touch",
       }}
     >
       <div
         style={{
-          width: "min(520px, 100%)",
-          padding: "20px",
-          border: "2px solid #475569",
-          borderRadius: "16px",
-          background: "#1e293b",
+          maxWidth: "760px",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
         }}
       >
-        <h1 style={{ marginTop: 0 }}>デッキ選択</h1>
+        <h1 style={{ margin: 0, fontSize: "22px" }}>
+          デッキ一覧
+        </h1>
 
-        <button
-          onClick={() => setMode("builder")}
+        {!isZipLoaded && (
+          <div
+            style={{
+              background: "#7f1d1d",
+              border: "1px solid #fca5a5",
+              borderRadius: "12px",
+              padding: "10px",
+              fontWeight: 800,
+            }}
+          >
+            画像ZIPが未読込です。デッキ編集・ゲーム開始前に読み込んでください。
+          </div>
+        )}
+
+        <div
           style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: "8px",
-            border: "none",
-            cursor: "pointer",
-            background: "#16a34a",
-            color: "white",
-            fontWeight: "bold",
-            marginBottom: "20px",
+            background: "#1e293b",
+            borderRadius: "12px",
+            padding: "10px",
+            display: "flex",
+            gap: "8px",
+            flexWrap: "wrap",
+            alignItems: "center",
           }}
         >
-          デッキ一覧
-        </button>
-
-        <div style={{ marginBottom: "24px" }}>
-          <label>プレイヤー1のデッキ</label>
-
-          <select
-            value={toDeckValue(player1Deck)}
-            onChange={(e) =>
-              setPlayer1Deck(parseDeckValue(e.target.value))
-            }
-            style={selectStyle}
+          <label
+            style={{
+              ...buttonStyle,
+              display: "inline-flex",
+              alignItems: "center",
+            }}
           >
-            <option value="">選択してください</option>
+            画像ZIP読込
+            <input
+              type="file"
+              accept=".zip"
+              onChange={(e) => {
+                handleLoadZip(e.target.files?.[0] ?? null);
+                e.currentTarget.value = "";
+              }}
+              style={{ display: "none" }}
+            />
+          </label>
 
-            {localDeckList.length > 0 && (
-              <optgroup label="作成デッキ">
-                {localDeckList.map((deck) => (
-                  <option key={deck.id} value={`local:${deck.id}`}>
-                    {deck.name} ({deck.mainCount}/50)
-                  </option>
-                ))}
-              </optgroup>
-            )}
-
-            {deckList.length > 0 && (
-              <optgroup label="付属デッキ">
-                {deckList.map((deck) => (
-                  <option key={deck.id} value={deck.path}>
-                    {deck.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-
+          <button style={primaryButtonStyle} onClick={openNewDeck}>
+            新規作成
+          </button>
         </div>
 
-        <div style={{ marginBottom: "28px" }}>
-          <label>プレイヤー2のデッキ</label>
-
-          <select
-            value={toDeckValue(player2Deck)}
-            onChange={(e) =>
-              setPlayer2Deck(parseDeckValue(e.target.value))
-            }
-            style={selectStyle}
+        {message && (
+          <div
+            style={{
+              background: "#334155",
+              padding: "8px 10px",
+              borderRadius: "8px",
+            }}
           >
-            <option value="">選択してください</option>
-
-            {localDeckList.length > 0 && (
-              <optgroup label="作成デッキ">
-                {localDeckList.map((deck) => (
-                  <option key={deck.id} value={`local:${deck.id}`}>
-                    {deck.name} ({deck.mainCount}/50)
-                  </option>
-                ))}
-              </optgroup>
-            )}
-
-            {deckList.length > 0 && (
-              <optgroup label="付属デッキ">
-                {deckList.map((deck) => (
-                  <option key={deck.id} value={deck.path}>
-                    {deck.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-
-        </div>
+            {message}
+          </div>
+        )}
 
         {error && (
-          <div style={{ color: "#f87171", marginBottom: "12px" }}>
+          <div
+            style={{
+              background: "#7f1d1d",
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid #fca5a5",
+            }}
+          >
             {error}
           </div>
         )}
 
-        <button
-          disabled={!canStart}
-          onClick={handleStart}
+        {decks.length === 0 ? (
+          <div
+            style={{
+              background: "#1e293b",
+              borderRadius: "12px",
+              padding: "16px",
+              color: "#cbd5e1",
+            }}
+          >
+            作成済みデッキはありません。「新規作成」から作ってください。
+          </div>
+        ) : (
+          decks.map((deck) => {
+            const usable = canUseDeck(deck);
+
+            return (
+              <div
+                key={deck.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  background: "#1e293b",
+                  padding: "10px",
+                  borderRadius: "12px",
+                  border: usable
+                    ? "1px solid #475569"
+                    : "1px solid #7f1d1d",
+                }}
+              >
+                {renderLeaderIcon(deck)}
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 900,
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {deck.name}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: usable ? "#cbd5e1" : "#fca5a5",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {getDeckStatus(deck)} / DON {deck.donDeck.length}枚
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "6px",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <button
+                      style={{
+                        ...buttonStyle,
+                        padding: "7px 4px",
+                        fontSize: "11px",
+                        background:
+                          player1DeckId === deck.id ? "#2563eb" : "#1e293b",
+                        opacity: usable ? 1 : 0.45,
+                      }}
+                      disabled={!usable}
+                      onClick={() => selectDeckForPlayer(1, deck)}
+                    >
+                      デッキ1に選択
+                    </button>
+
+                    <button
+                      style={{
+                        ...buttonStyle,
+                        padding: "7px 4px",
+                        fontSize: "11px",
+                        background:
+                          player2DeckId === deck.id ? "#2563eb" : "#1e293b",
+                        opacity: usable ? 1 : 0.45,
+                      }}
+                      disabled={!usable}
+                      onClick={() => selectDeckForPlayer(2, deck)}
+                    >
+                      デッキ2に選択
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  style={primaryButtonStyle}
+                  onClick={() => openEditDeck(deck.id)}
+                >
+                  編集
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          background: "rgba(15,23,42,0.98)",
+          borderTop: "2px solid #475569",
+          padding: "10px",
+          boxSizing: "border-box",
+          boxShadow: "0 -4px 16px rgba(0,0,0,0.45)",
+        }}
+      >
+        <div
           style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: "8px",
-            border: "none",
-            cursor: canStart ? "pointer" : "not-allowed",
-            background: canStart ? "#2563eb" : "#64748b",
-            color: "white",
-            fontWeight: "bold",
+            maxWidth: "760px",
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: "8px",
+            alignItems: "center",
           }}
         >
-          開始
-        </button>
+          <div
+            style={{
+              minWidth: 0,
+              fontSize: "12px",
+              lineHeight: 1.5,
+            }}
+          >
+            <div
+              style={{
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+              }}
+            >
+              デッキ1：{getDeckName(player1DeckId)}
+            </div>
+
+            <div
+              style={{
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+              }}
+            >
+              デッキ2：{getDeckName(player2DeckId)}
+            </div>
+          </div>
+
+          <button
+            disabled={!canStart()}
+            onClick={handleStart}
+            style={{
+              ...primaryButtonStyle,
+              minWidth: "86px",
+              height: "44px",
+              opacity: canStart() ? 1 : 0.45,
+              cursor: canStart() ? "pointer" : "not-allowed",
+            }}
+          >
+            開始
+          </button>
+        </div>
       </div>
     </div>
   );

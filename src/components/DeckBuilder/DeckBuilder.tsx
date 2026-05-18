@@ -18,6 +18,7 @@ import {
 
 type Props = {
   onBack: () => void;
+  initialDeckId?: string | null;
 };
 
 type ScreenMode = "list" | "edit" | "search";
@@ -81,18 +82,31 @@ function makeGroupedCards(cards: string[]) {
   );
 }
 
-export default function DeckBuilder({ onBack }: Props) {
-  const [mode, setMode] = useState<ScreenMode>("list");
+export default function DeckBuilder({
+  onBack,
+  initialDeckId = null,
+}: Props) {
+  const initialDecks = getAllLocalDeckRecipes();
+
+  const initialEditingDeck =
+    initialDeckId !== null
+      ? initialDecks.find((deck) => deck.id === initialDeckId) ?? null
+      : null;
+
+  const [mode, setMode] = useState<ScreenMode>(
+    initialEditingDeck ? "edit" : "list"
+  );
 
   const [cardImages, setCardImages] = useState<LocalCardImage[]>(
     getLocalCardImages()
   );
 
   const [decks, setDecks] = useState<DeckRecipe[]>(
-    getAllLocalDeckRecipes()
+    initialDecks
   );
 
-  const [editingDeck, setEditingDeck] = useState<DeckRecipe | null>(null);
+  const [editingDeck, setEditingDeck] =
+    useState<DeckRecipe | null>(initialEditingDeck);
 
   const [searchText, setSearchText] = useState("");
 
@@ -523,7 +537,7 @@ export default function DeckBuilder({ onBack }: Props) {
             <h1 style={{ margin: 0, fontSize: "22px" }}>デッキ一覧</h1>
 
             <button style={buttonStyle} onClick={onBack}>
-              トップへ戻る
+              デッキ選択へ戻る
             </button>
           </div>
 
