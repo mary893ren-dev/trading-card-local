@@ -30,7 +30,7 @@ export default function MulliganScreen() {
     >
       <div
         style={{
-          width: "900px",
+          width: "600px",
           padding: "24px",
           border: "2px solid #475569",
           borderRadius: "16px",
@@ -38,11 +38,11 @@ export default function MulliganScreen() {
         }}
       >
         <h1>
-          プレイヤー{mulliganPlayerIndex + 1}：マリガン確認
+          プレイヤー{mulliganPlayerIndex + 1}：確認
         </h1>
 
         <p>
-          この手札で開始するか、1回だけマリガンできます。
+          1回だけマリガンできます。
         </p>
 
         <div
@@ -59,7 +59,7 @@ export default function MulliganScreen() {
               key={card.id}
               src={card.image}
               style={{
-                width: "120px",
+                width: "75px",
                 borderRadius: "8px",
               }}
             />
@@ -69,7 +69,7 @@ export default function MulliganScreen() {
         <div
           style={{
             display: "flex",
-            gap: "16px",
+            gap: "2px",
             justifyContent: "center",
           }}
         >
