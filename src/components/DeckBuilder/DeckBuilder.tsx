@@ -270,14 +270,7 @@ export default function DeckBuilder({ onBack }: Props) {
   }
 
   function addCardToDon(cardId: string) {
-    const addCount = editingDeck
-      ? Math.min(10 - editingDeck.donDeck.length, 10)
-      : 0;
-
-    if (addCount <= 0) {
-      setMessage("DONは10枚までです。");
-      return;
-    }
+    const addCount = 10;
 
     updateEditingDeck((current) => ({
       ...current,
@@ -791,7 +784,7 @@ export default function DeckBuilder({ onBack }: Props) {
             </div>
 
             <div style={{ fontSize: "12px", color: "#cbd5e1" }}>
-              リーダー {editingDeck.leaderCardId ?? "未設定"} / メイン {editingDeck.mainDeck.length}/50 / DON {editingDeck.donDeck.length}/10
+              リーダー {editingDeck.leaderCardId ?? "未設定"} / メイン {editingDeck.mainDeck.length}/50 / DON {editingDeck.donDeck.length}枚
             </div>
           </div>
 
@@ -891,7 +884,7 @@ export default function DeckBuilder({ onBack }: Props) {
             }}
           >
             <h2 style={{ margin: "0 0 8px", fontSize: "16px" }}>
-              DON {editingDeck.donDeck.length}/10
+              DON {editingDeck.donDeck.length}枚
             </h2>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>

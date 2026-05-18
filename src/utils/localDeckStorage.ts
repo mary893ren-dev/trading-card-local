@@ -113,7 +113,7 @@ export function buildDeckCardsFromRecipe(recipe: DeckRecipe): CardData[] {
   );
 
   leader.lifeCount = recipe.leaderLifeCount;
-  leader.donCount = recipe.donDeck.length || 10;
+  leader.donCount = recipe.donDeck.length;
 
   const mainDeck = recipe.mainDeck.map((cardId) =>
     createCardData(
